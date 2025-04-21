@@ -25,7 +25,9 @@ app = FastAPI()
 # 创建上传目录
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
+# 创建静态数据目录
+STATIC_DIR='static'
+os.makedirs(STATIC_DIR, exist_ok=True)
 # 允许所有来源（生产环境建议指定具体域名）
 app.add_middleware(
     CORSMiddleware,
