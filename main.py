@@ -23,11 +23,10 @@ from urllib.parse import quote
 app = FastAPI()
 
 # 创建上传目录
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-# 创建静态数据目录
-STATIC_DIR='static'
-os.makedirs(STATIC_DIR, exist_ok=True)
+
+
 # 允许所有来源（生产环境建议指定具体域名）
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # 挂载静态文件目录
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount(UPLOAD_DIR, StaticFiles(directory="static"), name="static")
 
 class FileInfo(BaseModel):
     name: str
@@ -98,4 +97,4 @@ async def download_file(filename: str):
     )
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8004)
+    uvicorn.run(app, host='0.0.0.0', port=8003)
