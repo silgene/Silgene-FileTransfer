@@ -1,0 +1,291 @@
+<!-- static/index.html 美化后的前端 -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Transfer</title>
+    <style>
+        :root {
+            --primary: #4a90e2;
+            --danger: #e74c3c;
+            --background: #f5f7fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            background: var(--background);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .upload-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .file-input {
+            margin: 1rem 0;
+        }
+
+        .button {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .button:hover {
+            opacity: 0.9;
+        }
+
+        .button-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .file-item {
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-info {
+            flex: 1;
+            margin-right: 1rem;
+        }
+
+        .file-name {
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+        }
+
+        .file-meta {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .button-danger {
+            background: var(--danger);
+            color: white;
+            margin-left: 1rem;
+        }
+         /* 新增进度条样式 */
+        .progress-container {
+            margin: 1rem 0;
+            background: #eee;
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        /* 新增状态提示 */
+        .status {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 0.5rem;
+        }
+
+        /* 新增速度显示 */
+        .speed {
+            display: inline-block;
+            margin-left: 1rem;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📁 File Transfer</h1>
+        <p>Upload and manage your files</p>
+    </div>
+
+    <div class="upload-section">
+          <input type="file" id="fileInput" class="file-input">
+        <button class="button button-primary" onclick="startUpload()">Upload File</button>
+        <div class="progress-container" id="uploadProgress" style="display: none;">
+            <div class="progress-bar" id="uploadBar"></div>
+        </div>
+        <div class="status" id="uploadStatus"></div>
+    </div>
+
+    <div class="file-list" id="fileList">
+        <!-- 动态加载文件列表 -->
+    </div>
+
+    <script>
+        // 动态生成文件列表项
+        function createFileItem(file) {
+            const item = document.createElement('div');
+            item.className = 'file-item';
+
+            item.innerHTML = `
+                <div class="file-info">
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-meta">
+                        ${(file.size/1024).toFixed(2)}KB •
+                        ${new Date(file.modified_time * 1000).toLocaleDateString()}
+                    </div>
+                </div>
+                <button class="button button-primary"
+                    onclick="downloadFile('${file.name}')">Download</button>
+                <button class="button button-danger"
+                    onclick="deleteFile('${file.name}')">Delete</button>
+            `;
+            return item;
+        }
+    // 删除文件
+        async function deleteFile(filename) {
+            await fetch(`/files/${filename}`, {
+                method: 'DELETE'
+            });
+            await loadFiles();
+        }
+        // 加载文件列表（优化版）
+        async function loadFiles() {
+            try {
+                const response = await fetch('/files/');
+                const files = await response.json();
+                const container = document.getElementById('fileList');
+
+                container.innerHTML = ''; // 清空当前列表
+                files.forEach(file => {
+                    container.appendChild(createFileItem(file));
+                });
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        // 下载文件实现
+        async function downloadFile(filename) {
+            window.open(`/download/${filename}`, '_blank');
+        }
+
+        // 保持原有上传和删除逻辑，添加加载动画
+        async function uploadFile() {
+            const input = document.getElementById('fileInput');
+            if (!input.files.length) return alert('Please select a file');
+
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
+
+            try {
+                await fetch('/upload/', { method: 'POST', body: formData });
+                await loadFiles();
+                input.value = ''; // 清空文件选择
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+            }
+        }
+         // 上传进度跟踪
+        function startUpload() {
+            const input = document.getElementById('fileInput');
+            if (!input.files.length) return alert('请选择文件');
+
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+
+            // 显示进度条
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadStatus').textContent = '准备上传...';
+
+            // 上传进度跟踪
+            let uploadStartTime = Date.now();
+            xhr.upload.addEventListener('progress', function(e) {
+                const percent = (e.loaded / e.total * 100).toFixed(1);
+                const elapsed = (Date.now() - uploadStartTime) / 1000;
+                const speed = (e.loaded / 1024 / elapsed).toFixed(1);
+
+                document.getElementById('uploadBar').style.width = `${percent}%`;
+                document.getElementById('uploadStatus').textContent =
+                    `上传中: ${percent}% - 速度: ${speed} KB/s`;
+            });
+
+            xhr.onload = async function() {
+                if (xhr.status === 200) {
+                    document.getElementById('uploadStatus').textContent = '上传完成';
+                    await loadFiles();
+                    input.value = '';
+                    setTimeout(() => {
+                        document.getElementById('uploadProgress').style.display = 'none';
+                    }, 2000);
+                }
+            };
+
+            xhr.onerror = function() {
+                document.getElementById('uploadStatus').textContent = '上传失败';
+                document.getElementById('uploadProgress').style.display = 'none';
+            };
+
+            xhr.open('POST', '/upload/');
+            xhr.send(formData);
+        }
+
+        // 下载速度跟踪
+        async function downloadFile(filename) {
+            const startTime = Date.now();
+            let loaded = 0;
+
+            try {
+                const response = await fetch(`/download/${filename}`);
+                const reader = response.body.getReader();
+                const contentLength = +response.headers.get('Content-Length');
+
+                const statusElem = document.getElementById('downloadStatus');
+                const progressElem = document.getElementById('downloadProgress');
+
+                // 实时更新下载进度
+                while(true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+
+                    loaded += value.length;
+                    const percent = (loaded / contentLength * 100).toFixed(1);
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const speed = (loaded / 1024 / elapsed).toFixed(1);
+
+                    console.log(`下载进度: ${percent}% 速度: ${speed} KB/s`);
+                }
+
+                // 实际下载触发
+                window.open(`/download/${filename}`, '_blank');
+            } catch (error) {
+                console.error('下载失败:', error);
+            }
+        }
+
+        // 初始化加载
+        loadFiles();
+        setInterval(loadFiles, 5000); // 每5秒自动刷新
+    </script>
+</body>
+</html>
