@@ -23,7 +23,7 @@ from urllib.parse import quote
 app = FastAPI()
 
 # 创建上传目录
-UPLOAD_DIR = "/uploads"
+UPLOAD_DIR = "./static"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -36,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # 挂载静态文件目录
-app.mount(UPLOAD_DIR, StaticFiles(directory="static"), name="static")
+app.mount(UPLOAD_DIR[1:], StaticFiles(directory="static"), name="static")
 
 class FileInfo(BaseModel):
     name: str
