@@ -20,8 +20,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from urllib.parse import quote
 
 
-app = FastAPI()
-
+app = FastAPI(
+    max_request_size=1024 * 1024 * 1024  # 1GB
+)
 # 创建上传目录
 UPLOAD_DIR = "./static"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -95,6 +96,29 @@ async def download_file(filename: str):
         media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"},
     )
+from fastapi.responses import StreamingResponse
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    def iter_file():
+        with open(file_path, mode="rb") as f:
+            while chunk := f.read(1024 * 1024):  # 1MB chunks
+                yield chunk
+
+    encoded_filename = quote(filename, safe='')
+    return StreamingResponse(
+        iter_file(),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}",
+            "Content-Length": str(os.path.getsize(file_path))
+        }
+    )
+
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8003)
+    uvicorn.run(app, host='0.0.0.0', port=3002)
